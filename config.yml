@@ -1,0 +1,6 @@
+listen:
+  address: localhost
+  port: 13880
+connection:
+  max_threads: 100
+  keep_alive: 20
