@@ -1,5 +1,5 @@
 # What's this
-- psmb: A Pub-Sub protocol designed for BungeeCross
+- psmb: A protocol of **Pub-Sub Message Broker** designed for BungeeCross
 - pypsmb: *psmb* server implemented in Python
 
 
