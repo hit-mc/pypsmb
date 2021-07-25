@@ -1,11 +1,11 @@
 import re
-import threading
+import socket
 from collections import defaultdict
 from typing import List, Tuple, Dict, Iterator
 
 
 class MessageDispatcher:
-    subscriptions: List[Tuple[int, re.Pattern, threading.Event]]
+    subscriptions: List[Tuple[int, re.Pattern, socket.socket]]
     inbox: Dict[int, List[Tuple[bytes, str]]]  # subscriber_id -> (message, topic)
 
     def __init__(self):
@@ -13,16 +13,25 @@ class MessageDispatcher:
         self.subscriptions = []
 
     def publish(self, message: bytes, topic: str):
-        for subscriber_id, pattern, event in self.subscriptions:
+        for subscriber_id, pattern, lsock in self.subscriptions:
             assert isinstance(pattern, re.Pattern)
-            assert isinstance(event, threading.Event)
+            assert isinstance(lsock, socket.socket)
             if pattern.fullmatch(topic):
                 self.inbox[subscriber_id].append((message, topic))
-                event.set()
+                lsock.send(b'\x00')  # notify rsock
 
-    def subscribe(self, subscriber_id: int, pattern: str) -> threading.Event:
-        self.subscriptions.append((subscriber_id, re.compile(pattern), event := threading.Event()))
-        return event
+    def subscribe(self, subscriber_id: int, pattern: str) -> socket.socket:
+        lsock, rsock = socket.socketpair()
+        self.subscriptions.append((subscriber_id, re.compile(pattern), lsock))
+        return rsock
+
+    def unsubscribe(self, subscriber_id: int):
+        for ele in self.subscriptions:
+            _id, _, lsock = ele
+            if _id == subscriber_id:
+                lsock.close()
+                self.subscriptions.remove(ele)
+                break
 
     def read_inbox(self, subscriber_id: int) -> Iterator[Tuple[bytes, str]]:
         inbox = self.inbox[subscriber_id]

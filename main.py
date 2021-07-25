@@ -1,7 +1,11 @@
+import logging
 import socket
 import yaml
 from concurrent.futures import ThreadPoolExecutor
 import mb
+
+LOG_FORMAT = '[%(asctime)-15s][%(levelname)s][%(name)s] %(message)s'
+logging.basicConfig(format=LOG_FORMAT, level='INFO')
 
 if __name__ == '__main__':
     with open('config.yml', 'r', encoding='utf-8') as f:
