@@ -80,8 +80,8 @@ def _subscribe(sock: socket.socket, addr, dispatcher: MessageDispatcher, subscri
                         sock.sendall(len(message).to_bytes(8, NETWORK_BYTEORDER, signed=False))
                         sock.sendall(message)
     finally:
-        rsock.close()
         dispatcher.unsubscribe(subscriber_id)
+        rsock.close()
         logger.info('Removed subscriber %d.', subscriber_id)
 
 
