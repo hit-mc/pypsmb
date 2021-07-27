@@ -5,39 +5,49 @@ from collections import defaultdict
 from typing import List, Tuple, Dict, Iterator
 
 
-class MessageDispatcher:
+class SubscriberAlreadyExistsError(Exception):
+    pass
 
+
+class MessageDispatcher:
     logger = logging.getLogger('MessageDispatcher')
-    subscriptions: List[Tuple[int, re.Pattern, socket.socket]]
-    inbox: Dict[int, List[Tuple[bytes, str]]]  # subscriber_id -> (message, topic)
+
+    # subscriber_id -> (pattern, lsock, inbox)
+    subscriptions: Dict[int, Tuple[re.Pattern, socket.socket, List[Tuple[bytes, str]]]]
+
+    # inbox: Dict[int, List[Tuple[bytes, str]]]  # subscriber_id -> (message, topic)
 
     def __init__(self):
-        self.inbox = defaultdict(lambda: [])
-        self.subscriptions = []
+        # self.inbox = defaultdict(lambda: [])
+        self.subscriptions = {}
 
     def publish(self, message: bytes, topic: str):
-        for subscriber_id, pattern, lsock in self.subscriptions:
+        for subscriber_id, (pattern, lsock, inbox) in self.subscriptions.items():
             assert isinstance(pattern, re.Pattern)
             assert isinstance(lsock, socket.socket)
             if pattern.fullmatch(topic):
                 self.logger.info('Dispatch message to subscriber with id %d.', subscriber_id)
-                self.inbox[subscriber_id].append((message, topic))
-                lsock.send(b'\x00')  # notify rsock
+                inbox.append((message, topic))
+                try:
+                    lsock.send(b'\x00')  # notify rsock
+                except IOError as e:
+                    self.logger.error('Cannot notify subscriber %d with pattern %s: %s',
+                                      subscriber_id, pattern.pattern, e)
 
     def subscribe(self, subscriber_id: int, pattern: str) -> socket.socket:
         lsock, rsock = socket.socketpair()
-        self.subscriptions.append((subscriber_id, re.compile(pattern), lsock))
+        if subscriber_id in self.subscriptions:
+            raise SubscriberAlreadyExistsError()
+        self.subscriptions[subscriber_id] = re.compile(pattern), lsock, []
         return rsock
 
     def unsubscribe(self, subscriber_id: int):
-        for ele in self.subscriptions:
-            _id, _, lsock = ele
-            if _id == subscriber_id:
-                lsock.close()
-                self.subscriptions.remove(ele)
-                break
+        if subscriber_id not in self.subscriptions:
+            raise ValueError(f'Subscriber with id `{subscriber_id}` does not exist')
+        _, lsock, _ = self.subscriptions.pop(subscriber_id)
+        lsock.close()
 
     def read_inbox(self, subscriber_id: int) -> Iterator[Tuple[bytes, str]]:
-        inbox = self.inbox[subscriber_id]
+        inbox = self.subscriptions[subscriber_id][2]
         while inbox:
             yield inbox.pop(0)
