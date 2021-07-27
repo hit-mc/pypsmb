@@ -2,7 +2,7 @@ import logging
 import socket
 import yaml
 from concurrent.futures import ThreadPoolExecutor
-import mb
+import pypsmb.mb as mb
 
 LOG_FORMAT = '[%(asctime)-15s][%(levelname)s][%(name)s] %(message)s'
 logging.basicConfig(format=LOG_FORMAT, level='INFO')
