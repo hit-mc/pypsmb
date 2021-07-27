@@ -32,7 +32,7 @@ def _publish(sock: socket.socket, addr, dispatcher: MessageDispatcher,
             logger.info('Client is OK.')
             pass
         elif command == b'BYE':
-            logger.info('Bye bye.')
+            logger.info('Client BYE.')
             break
         elif command == b'MSG':
             logger.info('Receiving message...')
@@ -40,8 +40,11 @@ def _publish(sock: socket.socket, addr, dispatcher: MessageDispatcher,
             logger.info('Length: %d', message_length)
             message = read_exactly(sock, message_length)
             assert isinstance(message, bytes)
-            logger.info('Message: %s', message)
+            logger.info('Topic: %s, Message: %s', topic_id, message)
             dispatcher.publish(message, topic_id)
+        else:
+            logger.error('Invalid command from client: %s', command)
+            break
 
 
 def _subscribe(sock: socket.socket, addr, dispatcher: MessageDispatcher, subscriber_id: int, pattern: str,
