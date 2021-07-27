@@ -88,64 +88,64 @@ def _subscribe(sock: socket.socket, addr, dispatcher: MessageDispatcher, subscri
 def handle_client(sock: socket.socket, addr, dispatcher: MessageDispatcher, keep_alive: float):
     logger = logging.getLogger('%s:%d' % addr)
     try:
-        with sock:
-            logger.info('Handling client...')
+        logger.info('Handling client...')
 
-            if read_exactly(sock, 4) != b'PSMB':
-                logger.info('Bad protocol magic')
-                return
+        if read_exactly(sock, 4) != b'PSMB':
+            logger.info('Bad protocol magic')
+            return
 
-            protocol = socket.ntohl(struct.unpack('I', read_exactly(sock, 4))[0])
-            logger.info('Protocol version: %d', protocol)
-            if protocol != 1:
-                logger.info('Unsupported protocol')
-                sock.sendall(b'UNSUPPORTED PROTOCOL\0')
-                return
+        protocol = socket.ntohl(struct.unpack('I', read_exactly(sock, 4))[0])
+        logger.info('Protocol version: %d', protocol)
+        if protocol != 1:
+            logger.info('Unsupported protocol')
+            sock.sendall(b'UNSUPPORTED PROTOCOL\0')
+            return
 
-            options = read_exactly(sock, 4)
-            if options != b'\x00\x00\x00\x00':
-                logger.info('Bad options')
-                return
+        options = read_exactly(sock, 4)
+        if options != b'\x00\x00\x00\x00':
+            logger.info('Bad options')
+            return
 
-            sock.sendall(b'OK\0\x00\x00\x00\x00')
-            logger.info('Handshake complete.')
+        sock.sendall(b'OK\0\x00\x00\x00\x00')
+        logger.info('Handshake complete.')
 
-            while True:
-                mode = read_exactly(sock, 3)
-                if mode == b'PUB':
-                    topic_id = read_cstring(sock)
-                    try:
-                        topic_id = topic_id.decode('ascii')
-                    except UnicodeDecodeError:
-                        sock.sendall(b'FAILED\0' + b'Cannot decode topic id string with ASCII.\0')
-                        continue
-                    sock.sendall(b'OK\0')
-                    logger.info('Switched to PUBLISH mode.')
-                    _publish(sock, addr, dispatcher, topic_id, keep_alive, logger)
-                    break
-                elif mode == b'SUB':
-                    options = socket.ntohl(struct.unpack('I', read_exactly(sock, 4))[0])
-                    id_pattern = read_cstring(sock)
-                    subscriber_id = int.from_bytes(read_exactly(sock, 8), NETWORK_BYTEORDER, signed=False) \
-                        if (options & 1) else None
-                    try:
-                        id_pattern = id_pattern.decode('ascii')
-                    except UnicodeDecodeError:
-                        sock.sendall(b'FAILED\0' + b'Cannot decode pattern string with ASCII.\0')
-                        continue
-                    if not validate_pattern(id_pattern):
-                        sock.sendall(b'FAILED\0' + b'Invalid pattern string.\0')
-                        continue
-                    sock.sendall(b'OK\0')
-                    logger.info('Switched to SUBSCRIBE mode.')
-                    _subscribe(sock, addr, dispatcher, subscriber_id, id_pattern, keep_alive, logger)
-                    break
-                else:
-                    sock.sendall(b'BAD COMMAND\0')
-                    break
-
+        while True:
+            mode = read_exactly(sock, 3)
+            if mode == b'PUB':
+                topic_id = read_cstring(sock)
+                try:
+                    topic_id = topic_id.decode('ascii')
+                except UnicodeDecodeError:
+                    sock.sendall(b'FAILED\0' + b'Cannot decode topic id string with ASCII.\0')
+                    continue
+                sock.sendall(b'OK\0')
+                logger.info('Switched to PUBLISH mode.')
+                _publish(sock, addr, dispatcher, topic_id, keep_alive, logger)
+                break
+            elif mode == b'SUB':
+                options = socket.ntohl(struct.unpack('I', read_exactly(sock, 4))[0])
+                id_pattern = read_cstring(sock)
+                subscriber_id = int.from_bytes(read_exactly(sock, 8), NETWORK_BYTEORDER, signed=False) \
+                    if (options & 1) else None
+                try:
+                    id_pattern = id_pattern.decode('ascii')
+                except UnicodeDecodeError:
+                    sock.sendall(b'FAILED\0' + b'Cannot decode pattern string with ASCII.\0')
+                    continue
+                if not validate_pattern(id_pattern):
+                    sock.sendall(b'FAILED\0' + b'Invalid pattern string.\0')
+                    continue
+                sock.sendall(b'OK\0')
+                logger.info('Switched to SUBSCRIBE mode.')
+                _subscribe(sock, addr, dispatcher, subscriber_id, id_pattern, keep_alive, logger)
+                break
+            else:
+                sock.sendall(b'BAD COMMAND\0')
+                break
     except IncompleteReadError:
         pass
     except Exception as e:
         logger.error('Uncaught exception: %s', repr(e))
+    finally:
+        sock.close()
     logger.info('Handler exited.')

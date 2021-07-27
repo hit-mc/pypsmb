@@ -1,10 +1,13 @@
 import re
 import socket
+import logging
 from collections import defaultdict
 from typing import List, Tuple, Dict, Iterator
 
 
 class MessageDispatcher:
+
+    logger = logging.getLogger('MessageDispatcher')
     subscriptions: List[Tuple[int, re.Pattern, socket.socket]]
     inbox: Dict[int, List[Tuple[bytes, str]]]  # subscriber_id -> (message, topic)
 
@@ -17,6 +20,7 @@ class MessageDispatcher:
             assert isinstance(pattern, re.Pattern)
             assert isinstance(lsock, socket.socket)
             if pattern.fullmatch(topic):
+                self.logger.info('Dispatch message to subscriber with id %d.', subscriber_id)
                 self.inbox[subscriber_id].append((message, topic))
                 lsock.send(b'\x00')  # notify rsock
 
