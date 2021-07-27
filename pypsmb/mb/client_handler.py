@@ -61,6 +61,7 @@ def _subscribe(sock: socket.socket, addr, dispatcher: MessageDispatcher, subscri
                 # send keep-alive
                 logger.info('Send NOP.')
                 sock.sendall(b'NOP')
+                continue
             for ready_sock in rlist:
                 if ready_sock is sock:
                     # the client is ready
