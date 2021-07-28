@@ -1,13 +1,12 @@
-import threading
 import socket
 import struct
-import error
+import threading
 from typing import Union, Iterator, Callable
-from ..util import read_exactly, read_cstring
+
+from ..util import read_cstring
 
 
 class Subscriber(threading.Thread):
-
     _protocol_version = 1
 
     def __init__(self, host: str, port: int, topic: str,
@@ -34,7 +33,6 @@ class Subscriber(threading.Thread):
         if response == b'UNSUPPORTED PROTOCOL':
             raise RuntimeError('')
 
-
         self._sock = s
 
     def start(self) -> None:
@@ -48,8 +46,3 @@ class Subscriber(threading.Thread):
     def close(self):
         self._close_event.set()
         self.join()
-
-
-
-
-

@@ -2,7 +2,7 @@ import logging
 import socket
 import yaml
 from concurrent.futures import ThreadPoolExecutor
-import pypsmb.mb as mb
+from pypsmb import mb
 
 LOG_FORMAT = '[%(asctime)-15s][%(levelname)s][%(name)s] %(message)s'
 logging.basicConfig(format=LOG_FORMAT, level='INFO')
@@ -23,12 +23,7 @@ if __name__ == '__main__':
     executor = ThreadPoolExecutor(max_workers=max_threads)
     dispatcher = mb.MessageDispatcher()
 
-    listen_addr = (host, port)
-    sock = socket.create_server(listen_addr)
-    # if socket.has_dualstack_ipv6():
-    #     sock = socket.create_server(listen_addr, family=socket.AF_INET6, dualstack_ipv6=True)
-    # else:
-    #     sock = socket.create_server(listen_addr)
+    sock = socket.create_server((host, port))
 
     with sock:
         print(f'Listening on {host}:{port}...')

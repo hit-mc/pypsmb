@@ -39,7 +39,6 @@ def _publish(sock: socket.socket, addr, dispatcher: MessageDispatcher,
             message_length = int.from_bytes(read_exactly(sock, 8), NETWORK_BYTEORDER, signed=False)
             logger.info('Length: %d', message_length)
             message = read_exactly(sock, message_length)
-            assert isinstance(message, bytes)
             logger.info('Topic: %s, Message: %s', topic_id, message)
             dispatcher.publish(message, topic_id)
         else:
@@ -127,7 +126,7 @@ def handle_client(sock: socket.socket, addr, dispatcher: MessageDispatcher, keep
                 _publish(sock, addr, dispatcher, topic_id, keep_alive, logger)
                 break
             elif mode == b'SUB':
-                options = socket.ntohl(struct.unpack('I', read_exactly(sock, 4))[0])
+                options = int.from_bytes(read_exactly(sock, 4), NETWORK_BYTEORDER, signed=False)
                 id_pattern = read_cstring(sock)
                 subscriber_id = int.from_bytes(read_exactly(sock, 8), NETWORK_BYTEORDER, signed=False) \
                     if (options & 1) else None
@@ -146,10 +145,12 @@ def handle_client(sock: socket.socket, addr, dispatcher: MessageDispatcher, keep
             else:
                 sock.sendall(b'BAD COMMAND\0')
                 break
-    except IncompleteReadError:
-        pass
+    except IncompleteReadError as e:
+        logger.error('Unexpected EOF: %s', e)
+    except (ConnectionError, IOError) as e:
+        logger.error('Stream error: %s', e)
     except Exception as e:
         logger.error('Uncaught exception: %s', repr(e))
     finally:
         sock.close()
-    logger.info('Handler exited.')
+        logger.info('Handler exited.')

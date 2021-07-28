@@ -1,7 +1,6 @@
+import logging
 import re
 import socket
-import logging
-from collections import defaultdict
 from typing import List, Tuple, Dict, Iterator
 
 
@@ -10,16 +9,12 @@ class SubscriberAlreadyExistsError(Exception):
 
 
 class MessageDispatcher:
-    logger = logging.getLogger('MessageDispatcher')
-
     # subscriber_id -> (pattern, lsock, inbox)
     subscriptions: Dict[int, Tuple[re.Pattern, socket.socket, List[Tuple[bytes, str]]]]
 
-    # inbox: Dict[int, List[Tuple[bytes, str]]]  # subscriber_id -> (message, topic)
-
     def __init__(self):
-        # self.inbox = defaultdict(lambda: [])
         self.subscriptions = {}
+        self.logger = logging.getLogger(type(self).__name__)
 
     def publish(self, message: bytes, topic: str):
         for subscriber_id, (pattern, lsock, inbox) in self.subscriptions.items():
@@ -48,6 +43,6 @@ class MessageDispatcher:
         lsock.close()
 
     def read_inbox(self, subscriber_id: int) -> Iterator[Tuple[bytes, str]]:
-        inbox = self.subscriptions[subscriber_id][2]
+        _, _, inbox = self.subscriptions[subscriber_id]
         while inbox:
             yield inbox.pop(0)
