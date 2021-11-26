@@ -5,7 +5,8 @@ from typing import List, Tuple, Dict, Iterator
 
 
 class SubscriberAlreadyExistsError(Exception):
-    pass
+    def __init__(self, subscriber_id: int):
+        super().__init__(f'Subscriber {subscriber_id} already exists')
 
 
 class MessageDispatcher:
@@ -32,7 +33,7 @@ class MessageDispatcher:
     def subscribe(self, subscriber_id: int, pattern: str) -> socket.socket:
         lsock, rsock = socket.socketpair()
         if subscriber_id in self.subscriptions:
-            raise SubscriberAlreadyExistsError()
+            raise SubscriberAlreadyExistsError(subscriber_id)
         self.subscriptions[subscriber_id] = re.compile(pattern), lsock, []
         return rsock
 

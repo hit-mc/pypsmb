@@ -5,10 +5,15 @@ import struct
 import select
 from asyncio import IncompleteReadError
 
-from .message_dispatcher import MessageDispatcher
+from .message_dispatcher import MessageDispatcher, SubscriberAlreadyExistsError
 from ..util import read_exactly, read_cstring
 
 NETWORK_BYTEORDER = 'big'
+
+
+class InvalidMessageError(Exception):
+    def __init__(self, msg):
+        super().__init__(msg)
 
 
 def validate_pattern(s: str):
@@ -42,15 +47,14 @@ def _publish(sock: socket.socket, addr, dispatcher: MessageDispatcher,
             logger.info('Topic: %s, Message: %s', topic_id, message)
             dispatcher.publish(message, topic_id)
         else:
-            logger.error('Invalid command from client: %s', command)
-            break
+            raise InvalidMessageError(f'Invalid command from client: {command}')
 
 
 def _subscribe(sock: socket.socket, addr, dispatcher: MessageDispatcher, subscriber_id: int, pattern: str,
                keep_alive: float, logger):
     if keep_alive > 0:
         # sock.settimeout(keep_alive)
-        logger.info('Wait timeout: %fs.', keep_alive)
+        logger.info('Keepalive is enabled. Set socket timeout to %fs.', keep_alive)
     rsock = dispatcher.subscribe(subscriber_id, pattern)
     try:
         while True:
@@ -58,22 +62,22 @@ def _subscribe(sock: socket.socket, addr, dispatcher: MessageDispatcher, subscri
             if not rlist:
                 # timeout
                 # send keep-alive
-                logger.info('Send NOP.')
+                logger.info('Send NOP. (keepalive)')
                 sock.sendall(b'NOP')
+                logger.info('NOP is sent.')
                 continue
             for ready_sock in rlist:
                 if ready_sock is sock:
                     # the client is ready
                     command = read_exactly(sock, 3)
                     if command == b'NIL':
-                        logger.info('Client is OK.')
+                        logger.info('Client NIL. Client is OK.')
                     elif command == b'NOP':
                         logger.info('Client NOP.')
                         sock.sendall(b'NIL')
-                        logger.info('NIL is sent.')
+                        logger.info('Responded client NOP with NIL.')
                     else:
-                        logger.error('Invalid command from client: %s', command)
-                        return
+                        raise InvalidMessageError(f'Invalid command from client: {command}')
                 else:
                     # messages are ready
                     rsock.recv(1)  # read out the mark, this should complete immediately
@@ -82,6 +86,8 @@ def _subscribe(sock: socket.socket, addr, dispatcher: MessageDispatcher, subscri
                         sock.sendall(b'MSG')
                         sock.sendall(len(message).to_bytes(8, NETWORK_BYTEORDER, signed=False))
                         sock.sendall(message)
+    except Exception as e:
+        logger.error('Uncaught exception: %s', repr(e))
     finally:
         dispatcher.unsubscribe(subscriber_id)
         rsock.close()
@@ -94,19 +100,19 @@ def handle_client(sock: socket.socket, addr, dispatcher: MessageDispatcher, keep
         logger.info('Handling client...')
 
         if read_exactly(sock, 4) != b'PSMB':
-            logger.info('Bad protocol magic')
+            logger.info('Bad protocol magic.')
             return
 
         protocol = socket.ntohl(struct.unpack('I', read_exactly(sock, 4))[0])
         logger.info('Protocol version: %d', protocol)
         if protocol != 1:
-            logger.info('Unsupported protocol')
+            logger.info(f'Unsupported protocol: {protocol}')
             sock.sendall(b'UNSUPPORTED PROTOCOL\0')
             return
 
         options = read_exactly(sock, 4)
         if options != b'\x00\x00\x00\x00':
-            logger.info('Bad options')
+            logger.info(f'Bad options: {options}')
             return
 
         sock.sendall(b'OK\0\x00\x00\x00\x00')
@@ -122,7 +128,7 @@ def handle_client(sock: socket.socket, addr, dispatcher: MessageDispatcher, keep
                     sock.sendall(b'FAILED\0' + b'Cannot decode topic id string with ASCII.\0')
                     continue
                 sock.sendall(b'OK\0')
-                logger.info('Switched to PUBLISH mode.')
+                logger.info(f'Switched to PUBLISH mode. Topic is {topic_id}.')
                 _publish(sock, addr, dispatcher, topic_id, keep_alive, logger)
                 break
             elif mode == b'SUB':
@@ -139,12 +145,14 @@ def handle_client(sock: socket.socket, addr, dispatcher: MessageDispatcher, keep
                     sock.sendall(b'FAILED\0' + b'Invalid pattern string.\0')
                     continue
                 sock.sendall(b'OK\0')
-                logger.info('Switched to SUBSCRIBE mode.')
+                logger.info(f'Switched to SUBSCRIBE mode. Subscriber is {subscriber_id}.')
                 _subscribe(sock, addr, dispatcher, subscriber_id, id_pattern, keep_alive, logger)
                 break
             else:
                 sock.sendall(b'BAD COMMAND\0')
                 break
+    except SubscriberAlreadyExistsError as e:
+        logger.error(f'Invalid client: {e}')
     except IncompleteReadError as e:
         logger.error('Unexpected EOF: %s', e)
     except (ConnectionError, IOError) as e:
