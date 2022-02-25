@@ -3,12 +3,18 @@ import socket
 import yaml
 from concurrent.futures import ThreadPoolExecutor
 import pypsmb.mb as mb
+import argparse
 
 LOG_FORMAT = '[%(asctime)-15s][%(levelname)s][%(name)s] %(message)s'
 logging.basicConfig(format=LOG_FORMAT, level='INFO')
 
-if __name__ == '__main__':
-    with open('config.yml', 'r', encoding='utf-8') as f:
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-c', '--config', help='Path to or name of the configuaration file', required=False, default='config.yaml')
+    args = parser.parse_args()
+    config_filename = args.config
+    with open(config_filename, 'r', encoding='utf-8') as f:
         config = yaml.load(f, Loader=yaml.FullLoader)
     listen = config.get('listen') or {}
     connection = config.get('connection') or {}
@@ -36,3 +42,7 @@ if __name__ == '__main__':
             client, addr = sock.accept()
             executor.submit(mb.handle_client,
                             sock=client, addr=addr, dispatcher=dispatcher, keep_alive=keep_alive)
+
+
+if __name__ == '__main__':
+    main()
