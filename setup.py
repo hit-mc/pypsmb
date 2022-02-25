@@ -43,7 +43,7 @@ setup(
         ],
     },
     project_urls={
-        'Bug Reports': github_address+ '/issues',
+        'Bug Reports': github_address + '/issues',
         'Source': github_address,
     },
 )

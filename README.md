@@ -6,7 +6,7 @@
 # Usage
 1. Install Python 3.9+
 2. Install pypsmb `pip install pypsmb`
-3. Enjoy it `pypsmb`
+3. Enjoy it: `pypsmb`
 
 ## Config Path
 
