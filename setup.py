@@ -27,6 +27,7 @@ setup(
         'Operating System :: Microsoft :: Windows',
         'Operating System :: POSIX :: Linux',
         'Programming Language :: Python :: 3',
+        'Programming Language :: Python :: 3.8',
         'Programming Language :: Python :: 3.9',
         'Programming Language :: Python :: 3.10',
         'Programming Language :: Python :: 3 :: Only',
@@ -35,7 +36,7 @@ setup(
     keywords='Chattings, PSMB, Minecraft, BungeeCross, CrossLink',
     package_dir={'pypsmb': 'pypsmb'},
     packages=find_packages('.'),
-    python_requires='>=3.9, <4',
+    python_requires='>=3.8, <4',
     install_requires=['PyYAML'],
     entry_points={
         'console_scripts': [
