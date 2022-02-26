@@ -47,11 +47,13 @@ def _publish(sock: socket.socket, addr, dispatcher: MessageDispatcher,
             break
 
 
-def _subscribe(sock: socket.socket, addr, dispatcher: MessageDispatcher, subscriber_id: int, pattern: str,
+def _subscribe(sock: socket.socket, addr, dispatcher: MessageDispatcher, subscriber_id: int | None, pattern: str,
                keep_alive: float, logger):
     if keep_alive > 0:
         # sock.settimeout(keep_alive)
         logger.info('Wait timeout: %fs.', keep_alive)
+    if subscriber_id is None:
+        subscriber_id = 0 # 使用这个作为默认ID
     rsock = dispatcher.subscribe(subscriber_id, pattern)
     try:
         while True:
@@ -129,8 +131,10 @@ def handle_client(sock: socket.socket, addr, dispatcher: MessageDispatcher, keep
             elif mode == b'SUB':
                 options = socket.ntohl(struct.unpack('I', read_exactly(sock, 4))[0])
                 id_pattern = read_cstring(sock)
-                subscriber_id = int.from_bytes(read_exactly(sock, 8), NETWORK_BYTEORDER, signed=False) \
-                    if (options & 1) else None
+                if options & 1:
+                    subscriber_id = int.from_bytes(read_exactly(sock, 8), NETWORK_BYTEORDER, signed=False)
+                else:
+                    subscriber_id = None
                 try:
                     id_pattern = id_pattern.decode('ascii')
                 except UnicodeDecodeError:
