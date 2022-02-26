@@ -68,7 +68,7 @@ class PublishProtocol(PSMBHandshakeProtocol):
                 self.state = ClientState.MSG_EXCHANGING
                 self.exchange_ready.set()
 
-    def send_msg(self, *msg_list: str):
+    async def send_msg(self, *msg_list: str):
         assert self.state == ClientState.MSG_EXCHANGING
         for msg in msg_list:
             self._transport.write(b'MSG')
