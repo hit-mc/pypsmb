@@ -47,9 +47,12 @@ def main():
     with sock:
         print(f'Listening on {host}:{port}...')
         while True:
-            client, addr = sock.accept()
-            executor.submit(mb.handle_client,
-                            sock=client, addr=addr, dispatcher=dispatcher, keep_alive=keep_alive)
+            try:
+                client, addr = sock.accept()
+                executor.submit(mb.handle_client,
+                                sock=client, addr=addr, dispatcher=dispatcher, keep_alive=keep_alive)
+            except ssl.SSLEOFError:
+                pass
 
 
 if __name__ == '__main__':
