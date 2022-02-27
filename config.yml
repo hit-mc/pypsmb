@@ -4,3 +4,6 @@ listen:
 connection:
   max_threads: 100
   keep_alive: 20
+ssl:
+  certchain: path/to/certchain.pem
+  privatekey: path/to/private.key
