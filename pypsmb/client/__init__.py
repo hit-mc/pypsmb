@@ -53,6 +53,11 @@ class PublishProtocol(PSMBHandshakeProtocol):
         super().__init__(on_con_lost, exchange_ready)
         self.topic = topic
 
+    async def _nop(self):
+        while True:
+            await asyncio.sleep(15)
+            self._transport.write(b"NOP")
+
     def data_received(self, data: bytes) -> None:
         super().data_received(data)
         if self.state == ClientState.MODE_CHOOSING_START:
@@ -67,6 +72,12 @@ class PublishProtocol(PSMBHandshakeProtocol):
             else:
                 self.state = ClientState.MSG_EXCHANGING
                 self.exchange_ready.set()
+                loop = asyncio.get_event_loop()
+                self.nop_task = loop.create_task(self._nop())
+
+    def connection_lost(self, exc: Exception | None) -> None:
+        super().connection_lost(exc)
+        self.nop_task.cancel()
 
     async def send_msg(self, *msg_list: str):
         assert self.state == ClientState.MSG_EXCHANGING
@@ -75,6 +86,9 @@ class PublishProtocol(PSMBHandshakeProtocol):
             data = msg.encode(encoding='UTF-8')
             self._transport.write(len(data).to_bytes(8, 'big'))
             self._transport.write(data)
+
+    async def send_nop(self) -> None:
+        self._transport.write(b"NOP")
 
 
 class SubscribeProtocol(PSMBHandshakeProtocol):
