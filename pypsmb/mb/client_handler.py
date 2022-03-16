@@ -57,7 +57,7 @@ def _publish(sock: socket.socket, addr, dispatcher: MessageDispatcher,
                 pending_keepalive_count = 0
                 pass
             elif command == b'BYE':
-                logger.info('Client BYE.')
+                logger.info('Client BYE. Disconnecting.')
                 break
             elif command == b'MSG':
                 logger.info('Receiving message...')
@@ -106,6 +106,9 @@ def _subscribe(sock: socket.socket, addr, dispatcher: MessageDispatcher, subscri
                         logger.info('Client NOP.')
                         sock.sendall(b'NIL')
                         logger.info('Responded client NOP with NIL.')
+                    elif command == b'BYE':
+                        logger.info('Client BYE. Disconnecting.')
+                        break
                     else:
                         raise InvalidMessageError(f'Invalid command from client: {command}')
                 else:
