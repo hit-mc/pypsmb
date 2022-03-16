@@ -183,7 +183,6 @@ def handle_client(sock: socket.socket, addr, dispatcher: MessageDispatcher, keep
                 break
             else:
                 sock.sendall(b'BAD COMMAND\0')
-
                 break
     except SubscriberAlreadyExistsError as e:
         logger.error(f'Invalid client: {e}')
