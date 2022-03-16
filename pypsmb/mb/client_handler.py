@@ -51,20 +51,27 @@ def _publish(sock: socket.socket, addr, dispatcher: MessageDispatcher,
 
 
 def _subscribe(sock: socket.socket, addr, dispatcher: MessageDispatcher, subscriber_id: int, pattern: str,
-               keep_alive: float, logger):
+               keep_alive: float, logger, max_pending_keepalive: int = 3):
     if keep_alive > 0:
         # sock.settimeout(keep_alive)
         logger.info('Keepalive is enabled. Set socket timeout to %fs.', keep_alive)
     rsock = dispatcher.subscribe(subscriber_id, pattern)
+    pending_keepalive_count = 0  # how many continuous NOP did we sent, which is not responded by the client
     try:
         while True:
             rlist, _, _ = select.select([sock, rsock], [], [], keep_alive if (keep_alive > 0) else None)
             if not rlist:
                 # timeout
                 # send keep-alive
+                if pending_keepalive_count == max_pending_keepalive:
+                    # the client is not sensible
+                    # kick it
+                    logger.error('Insensible client (too many pending keepalive responses). Kick it.')
+                    break
                 logger.info('Send NOP. (keepalive)')
                 sock.sendall(b'NOP')
                 logger.info('NOP is sent.')
+                pending_keepalive_count += 1
                 continue
             for ready_sock in rlist:
                 if ready_sock is sock:
@@ -72,6 +79,7 @@ def _subscribe(sock: socket.socket, addr, dispatcher: MessageDispatcher, subscri
                     command = read_exactly(sock, 3)
                     if command == b'NIL':
                         logger.info('Client NIL. Client is OK.')
+                        pending_keepalive_count = 0
                     elif command == b'NOP':
                         logger.info('Client NOP.')
                         sock.sendall(b'NIL')
