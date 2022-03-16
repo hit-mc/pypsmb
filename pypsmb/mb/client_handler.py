@@ -25,29 +25,47 @@ def validate_pattern(s: str):
 
 
 def _publish(sock: socket.socket, addr, dispatcher: MessageDispatcher,
-             topic_id: str, keep_alive: float, logger):
-    while True:
-        logger.info('Waiting for client command...')
-        command = read_exactly(sock, 3)
-        if command == b'NOP':
-            logger.info('Client NOP.')
-            sock.sendall(b'NIL')
-            logger.info('NIL is sent.')
-        elif command == b'NIL':
-            logger.info('Client is OK.')
-            pass
-        elif command == b'BYE':
-            logger.info('Client BYE.')
-            break
-        elif command == b'MSG':
-            logger.info('Receiving message...')
-            message_length = int.from_bytes(read_exactly(sock, 8), NETWORK_BYTEORDER, signed=False)
-            logger.info('Length: %d', message_length)
-            message = read_exactly(sock, message_length)
-            logger.info('Topic: %s, Message: %s', topic_id, message)
-            dispatcher.publish(message, topic_id)
-        else:
-            raise InvalidMessageError(f'Invalid command from client: {command}')
+             topic_id: str, keep_alive: float, logger, max_pending_keepalive: int = 3):
+    pending_keepalive_count = 0  # how many continuous NOP did we sent, which is not responded by the client
+    try:
+        while True:
+            logger.info('Waiting for client command...')
+            rlist, _, _ = select.select([sock], [], [], keep_alive if (keep_alive > 0) else None)
+            if not rlist:
+                # timeout, send keepalive
+                if pending_keepalive_count == max_pending_keepalive:
+                    # the client is not sensible
+                    # kick it
+                    logger.error('Insensible client (too many pending keepalive responses). Kick it.')
+                    break
+                logger.info('Send NOP. (keepalive)')
+                sock.sendall(b'NOP')
+                logger.info('NOP is sent.')
+                pending_keepalive_count += 1
+                continue
+            command = read_exactly(sock, 3)
+            if command == b'NOP':
+                logger.info('Client NOP.')
+                sock.sendall(b'NIL')
+                logger.info('NIL is sent.')
+            elif command == b'NIL':
+                logger.info('Client is OK.')
+                pending_keepalive_count = 0
+                pass
+            elif command == b'BYE':
+                logger.info('Client BYE.')
+                break
+            elif command == b'MSG':
+                logger.info('Receiving message...')
+                message_length = int.from_bytes(read_exactly(sock, 8), NETWORK_BYTEORDER, signed=False)
+                logger.info('Length: %d', message_length)
+                message = read_exactly(sock, message_length)
+                logger.info('Topic: %s, Message: %s', topic_id, message)
+                dispatcher.publish(message, topic_id)
+            else:
+                raise InvalidMessageError(f'Invalid command from client: {command}')
+    except IncompleteReadError:
+        logger.info('Connection is closed.')
 
 
 def _subscribe(sock: socket.socket, addr, dispatcher: MessageDispatcher, subscriber_id: int, pattern: str,
