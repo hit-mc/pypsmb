@@ -51,7 +51,7 @@ def _publish(sock: socket.socket, addr, dispatcher: MessageDispatcher,
             if command == b'NOP':
                 logger.info('Client NOP.')
                 sock.sendall(b'NIL')
-                logger.info('NIL is sent.')
+                logger.info('Responded with NIL.')
             elif command == b'NIL':
                 logger.info('Client is OK.')
                 pending_keepalive_count = 0
@@ -105,7 +105,7 @@ def _subscribe(sock: socket.socket, addr, dispatcher: MessageDispatcher, subscri
                     elif command == b'NOP':
                         logger.info('Client NOP.')
                         sock.sendall(b'NIL')
-                        logger.info('Responded client NOP with NIL.')
+                        logger.info('Responded with NIL.')
                     elif command == b'BYE':
                         logger.info('Client BYE. Disconnecting.')
                         break
