@@ -119,8 +119,8 @@ def _subscribe(sock: socket.socket, addr, dispatcher: MessageDispatcher, subscri
                         sock.sendall(b'MSG')
                         sock.sendall(len(message).to_bytes(8, NETWORK_BYTEORDER, signed=False))
                         sock.sendall(message)
-    except Exception as e:
-        logger.error('Uncaught exception: %s', repr(e))
+    except Exception:
+        logger.exception('Unexpected exception.')
     finally:
         dispatcher.unsubscribe(subscriber_id)
         rsock.close()
@@ -190,8 +190,8 @@ def handle_client(sock: socket.socket, addr, dispatcher: MessageDispatcher, keep
         logger.error('Unexpected EOF: %s', e)
     except (ConnectionError, IOError) as e:
         logger.error('Stream error: %s', e)
-    except Exception as e:
-        logger.error('Uncaught exception: %s', repr(e))
+    except Exception:
+        logger.exception('Uncaught exception.')
     finally:
         sock.close()
         logger.info('Handler exited.')
