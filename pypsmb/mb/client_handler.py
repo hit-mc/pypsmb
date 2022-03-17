@@ -184,14 +184,12 @@ def handle_client(sock: socket.socket, addr, dispatcher: MessageDispatcher, keep
             else:
                 sock.sendall(b'BAD COMMAND\0')
                 break
-    except SubscriberAlreadyExistsError as e:
-        logger.error(f'Invalid client: {e}')
-    except IncompleteReadError as e:
-        logger.error('Unexpected EOF: %s', e)
-    except (ConnectionError, IOError) as e:
-        logger.error('Stream error: %s', e)
+    except SubscriberAlreadyExistsError:
+        logger.exception(f'Invalid client.')
+    except (ConnectionError, IOError, IncompleteReadError):
+        logger.exception('I/O error.')
     except Exception:
-        logger.exception('Uncaught exception.')
+        logger.exception('Unexpected exception.')
     finally:
         sock.close()
         logger.info('Handler exited.')
