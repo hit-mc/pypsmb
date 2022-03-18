@@ -85,7 +85,7 @@ def _subscribe(sock: socket.socket, addr, dispatcher: MessageDispatcher, subscri
         bytes_id = str(subscriber_id).encode('ascii')
     else:
         # generate a unique id for subscribers who do not have id
-        bytes_id = uuid.uuid1().bytes
+        bytes_id = uuid.uuid1().hex.encode()
 
     rsock = dispatcher.subscribe(bytes_id, pattern)
     pending_keepalive_count = 0  # how many continuous NOP did we sent, which is not responded by the client
