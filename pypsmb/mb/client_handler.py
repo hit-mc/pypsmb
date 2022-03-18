@@ -118,7 +118,7 @@ def _subscribe(sock: socket.socket, addr, dispatcher: MessageDispatcher, subscri
                         logger.info('Responded with NIL.')
                     elif command == b'BYE':
                         logger.info('Client BYE. Disconnecting.')
-                        break
+                        return
                     else:
                         raise InvalidMessageError(f'Invalid command from client: {command!r}')
                 else:
