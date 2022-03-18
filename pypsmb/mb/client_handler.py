@@ -134,7 +134,7 @@ def _subscribe(sock: socket.socket, addr, dispatcher: MessageDispatcher, subscri
     finally:
         dispatcher.unsubscribe(bytes_id)
         rsock.close()
-        logger.info('Removed subscriber %d.', bytes_id)
+        logger.info(f'Removed subscriber {bytes_id!r}.')
 
 
 def handle_client(sock: socket.socket, addr, dispatcher: MessageDispatcher, keep_alive: float):
