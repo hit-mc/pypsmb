@@ -176,8 +176,13 @@ def handle_client(sock: socket.socket, addr, dispatcher: MessageDispatcher, keep
             elif mode == b'SUB':
                 subscribe_options = int.from_bytes(read_exactly(sock, 4), NETWORK_BYTEORDER, signed=False)
                 id_pattern_bytes = read_cstring(sock)
-                subscriber_id = int.from_bytes(read_exactly(sock, 8), NETWORK_BYTEORDER, signed=False) \
-                    if (subscribe_options & 1) else None
+
+                # read optional subscriber_id
+                if subscribe_options & 1:
+                    subscriber_id = int.from_bytes(read_exactly(sock, 8), NETWORK_BYTEORDER, signed=False)
+                else:
+                    subscriber_id = None
+
                 try:
                     id_pattern = id_pattern_bytes.decode('ascii')
                 except UnicodeDecodeError:
@@ -187,7 +192,11 @@ def handle_client(sock: socket.socket, addr, dispatcher: MessageDispatcher, keep
                     sock.sendall(b'FAILED\0' + b'Invalid pattern string.\0')
                     continue
                 sock.sendall(b'OK\0')
-                logger.info(f'Switch to SUBSCRIBE mode. Subscriber is {subscriber_id}.')
+                logger.info(f'Switch to SUBSCRIBE mode.')
+                if subscriber_id is not None:
+                    logger.info(f'ID is {subscriber_id}.')
+                else:
+                    logger.info('ID is not specified. Message replay is not available.')
                 _subscribe(sock, addr, dispatcher, subscriber_id, id_pattern, keep_alive)
                 break
             else:
