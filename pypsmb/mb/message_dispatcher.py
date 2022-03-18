@@ -1,17 +1,17 @@
 import logging
 import re
 import socket
-from typing import List, Tuple, Dict, Iterator
+from typing import List, Tuple, Dict, Iterator, Union
 
 
 class SubscriberAlreadyExistsError(Exception):
-    def __init__(self, subscriber_id: int):
-        super().__init__(f'Subscriber {subscriber_id} already exists')
+    def __init__(self, subscriber_id: Union[bytes, int]):
+        super().__init__(f'Subscriber {subscriber_id!r} already exists')
 
 
 class MessageDispatcher:
     # subscriber_id -> (pattern, lsock, inbox)
-    subscriptions: Dict[int, Tuple[re.Pattern, socket.socket, List[Tuple[bytes, str]]]]
+    subscriptions: Dict[bytes, Tuple[re.Pattern, socket.socket, List[Tuple[bytes, str]]]]
 
     def __init__(self):
         self.subscriptions = {}
@@ -30,20 +30,20 @@ class MessageDispatcher:
                     self.logger.error('Cannot notify subscriber %d with pattern %s: %s',
                                       subscriber_id, pattern.pattern, e)
 
-    def subscribe(self, subscriber_id: int, pattern: str) -> socket.socket:
+    def subscribe(self, subscriber_id: bytes, pattern: str) -> socket.socket:
         lsock, rsock = socket.socketpair()
         if subscriber_id in self.subscriptions:
             raise SubscriberAlreadyExistsError(subscriber_id)
         self.subscriptions[subscriber_id] = re.compile(pattern), lsock, []
         return rsock
 
-    def unsubscribe(self, subscriber_id: int):
+    def unsubscribe(self, subscriber_id: bytes):
         if subscriber_id not in self.subscriptions:
-            raise ValueError(f'Subscriber with id `{subscriber_id}` does not exist')
+            raise ValueError(f'Subscriber with id `{subscriber_id!r}` does not exist')
         _, lsock, _ = self.subscriptions.pop(subscriber_id)
         lsock.close()
 
-    def read_inbox(self, subscriber_id: int) -> Iterator[Tuple[bytes, str]]:
+    def read_inbox(self, subscriber_id: bytes) -> Iterator[Tuple[bytes, str]]:
         _, _, inbox = self.subscriptions[subscriber_id]
         while inbox:
             yield inbox.pop(0)

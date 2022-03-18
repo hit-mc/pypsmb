@@ -3,12 +3,14 @@ import re
 import socket
 import struct
 import select
+import uuid
 from asyncio import IncompleteReadError
+from typing import Literal, Optional
 
 from .message_dispatcher import MessageDispatcher, SubscriberAlreadyExistsError
 from ..util import read_exactly, read_cstring
 
-NETWORK_BYTEORDER = 'big'
+NETWORK_BYTEORDER: Literal['big'] = 'big'
 
 
 class InvalidMessageError(Exception):
@@ -67,16 +69,25 @@ def _publish(sock: socket.socket, addr, dispatcher: MessageDispatcher,
             logger.info('Topic: %s, Message: %s.', topic_id, message)
             dispatcher.publish(message, topic_id)
         else:
-            raise InvalidMessageError(f'Invalid command from client: {command}')
+            raise InvalidMessageError(f'Invalid command from client: {command!r}')
 
 
-def _subscribe(sock: socket.socket, addr, dispatcher: MessageDispatcher, subscriber_id: int, pattern: str,
+def _subscribe(sock: socket.socket, addr, dispatcher: MessageDispatcher, subscriber_id: Optional[int], pattern: str,
                keep_alive: float, max_pending_keepalive: int = 3):
     logger = logging.getLogger('subscribe,%s:%d' % addr)
     if keep_alive > 0:
         # sock.settimeout(keep_alive)
         logger.info('Keepalive is enabled. Set socket timeout to %fs.', keep_alive)
-    rsock = dispatcher.subscribe(subscriber_id, pattern)
+
+    # instead of the original int64 id, we use arbitrary bytes to distinguish different clients in the internal
+    # thus we can generate unique UUIDs for subscribers with id unspecified, simplifying our implementation
+    if subscriber_id is not None:
+        bytes_id = str(subscriber_id).encode('ascii')
+    else:
+        # generate a unique id for subscribers who do not have id
+        bytes_id = uuid.uuid1().bytes
+
+    rsock = dispatcher.subscribe(bytes_id, pattern)
     pending_keepalive_count = 0  # how many continuous NOP did we sent, which is not responded by the client
     try:
         while True:
@@ -109,11 +120,11 @@ def _subscribe(sock: socket.socket, addr, dispatcher: MessageDispatcher, subscri
                         logger.info('Client BYE. Disconnecting.')
                         break
                     else:
-                        raise InvalidMessageError(f'Invalid command from client: {command}')
+                        raise InvalidMessageError(f'Invalid command from client: {command!r}')
                 else:
                     # messages are ready
                     rsock.recv(1)  # read out the mark, this should complete immediately
-                    for message, topic in dispatcher.read_inbox(subscriber_id):
+                    for message, topic in dispatcher.read_inbox(bytes_id):
                         logger.info('Message size: %d, topic: %s', len(message), topic)
                         sock.sendall(b'MSG')
                         sock.sendall(len(message).to_bytes(8, NETWORK_BYTEORDER, signed=False))
@@ -121,9 +132,9 @@ def _subscribe(sock: socket.socket, addr, dispatcher: MessageDispatcher, subscri
     except Exception:
         logger.exception('An exception occurred. Disconnecting.')
     finally:
-        dispatcher.unsubscribe(subscriber_id)
+        dispatcher.unsubscribe(bytes_id)
         rsock.close()
-        logger.info('Removed subscriber %d.', subscriber_id)
+        logger.info('Removed subscriber %d.', bytes_id)
 
 
 def handle_client(sock: socket.socket, addr, dispatcher: MessageDispatcher, keep_alive: float):
@@ -144,7 +155,7 @@ def handle_client(sock: socket.socket, addr, dispatcher: MessageDispatcher, keep
 
         options = read_exactly(sock, 4)
         if options != b'\x00\x00\x00\x00':
-            logger.info(f'Bad options: {options}')
+            logger.info(f'Bad options: {options!r}')
             return
 
         sock.sendall(b'OK\0\x00\x00\x00\x00')
@@ -153,9 +164,8 @@ def handle_client(sock: socket.socket, addr, dispatcher: MessageDispatcher, keep
         while True:
             mode = read_exactly(sock, 3)
             if mode == b'PUB':
-                topic_id = read_cstring(sock)
                 try:
-                    topic_id = topic_id.decode('ascii')
+                    topic_id = read_cstring(sock).decode('ascii')
                 except UnicodeDecodeError:
                     sock.sendall(b'FAILED\0' + b'Cannot decode topic id string with ASCII.\0')
                     continue
@@ -164,12 +174,12 @@ def handle_client(sock: socket.socket, addr, dispatcher: MessageDispatcher, keep
                 _publish(sock, addr, dispatcher, topic_id, keep_alive, protocol=protocol)
                 break
             elif mode == b'SUB':
-                options = int.from_bytes(read_exactly(sock, 4), NETWORK_BYTEORDER, signed=False)
-                id_pattern = read_cstring(sock)
+                subscribe_options = int.from_bytes(read_exactly(sock, 4), NETWORK_BYTEORDER, signed=False)
+                id_pattern_bytes = read_cstring(sock)
                 subscriber_id = int.from_bytes(read_exactly(sock, 8), NETWORK_BYTEORDER, signed=False) \
-                    if (options & 1) else None
+                    if (subscribe_options & 1) else None
                 try:
-                    id_pattern = id_pattern.decode('ascii')
+                    id_pattern = id_pattern_bytes.decode('ascii')
                 except UnicodeDecodeError:
                     sock.sendall(b'FAILED\0' + b'Cannot decode pattern string with ASCII.\0')
                     continue
