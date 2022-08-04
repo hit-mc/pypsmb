@@ -22,13 +22,12 @@ class MessageDispatcher:
             assert isinstance(pattern, re.Pattern)
             assert isinstance(lsock, socket.socket)
             if pattern.fullmatch(topic):
-                self.logger.info('Dispatch message to subscriber with id %d.', subscriber_id)
+                self.logger.info(f'Dispatch message to subscriber with id {subscriber_id}.')
                 inbox.append((message, topic))
                 try:
                     lsock.send(b'\x00')  # notify rsock
-                except IOError as e:
-                    self.logger.error('Cannot notify subscriber %d with pattern %s: %s',
-                                      subscriber_id, pattern.pattern, e)
+                except IOError:
+                    self.logger.exception(f'Cannot notify subscriber {subscriber_id} with pattern {pattern.pattern}')
 
     def subscribe(self, subscriber_id: bytes, pattern: str) -> socket.socket:
         lsock, rsock = socket.socketpair()
