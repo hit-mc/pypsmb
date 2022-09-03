@@ -64,9 +64,9 @@ def _publish(sock: socket.socket, addr, dispatcher: MessageDispatcher,
         elif command == b'MSG':
             logger.info('Receiving new message from client...')
             message_length = int.from_bytes(read_exactly(sock, 8), NETWORK_BYTEORDER, signed=False)
-            logger.info('Message length: %d byte(s).', message_length)
+            logger.info(f'Message length: {message_length} byte(s).')
             message = read_exactly(sock, message_length)
-            logger.info('Topic: %s, Message: %s.', topic_id, message)
+            logger.info(f'Topic: {topic_id}, Message: {message}.')
             dispatcher.publish(message, topic_id)
         else:
             raise InvalidMessageError(f'Invalid command from client: {command!r}')
@@ -77,7 +77,8 @@ def _subscribe(sock: socket.socket, addr, dispatcher: MessageDispatcher, subscri
     logger = logging.getLogger('subscribe,%s:%d' % addr)
     if keep_alive > 0:
         # sock.settimeout(keep_alive)
-        logger.info('Keepalive is enabled. Set socket timeout to %fs.', keep_alive)
+        logger.info(
+            f'Keepalive is enabled. Set socket timeout to {keep_alive}s.')
 
     # instead of the original int64 id, we use arbitrary bytes to distinguish different clients in the internal
     # thus we can generate unique UUIDs for subscribers with id unspecified, simplifying our implementation
@@ -125,7 +126,8 @@ def _subscribe(sock: socket.socket, addr, dispatcher: MessageDispatcher, subscri
                     # messages are ready
                     rsock.recv(1)  # read out the mark, this should complete immediately
                     for message, topic in dispatcher.read_inbox(bytes_id):
-                        logger.info('Message size: %d, topic: %s', len(message), topic)
+                        logger.info(
+                            f'Message size: {len(message)}, topic: {topic}')
                         sock.sendall(b'MSG')
                         sock.sendall(len(message).to_bytes(8, NETWORK_BYTEORDER, signed=False))
                         sock.sendall(message)
@@ -147,7 +149,7 @@ def handle_client(sock: socket.socket, addr, dispatcher: MessageDispatcher, keep
             return
 
         protocol = socket.ntohl(struct.unpack('I', read_exactly(sock, 4))[0])
-        logger.info('Protocol version: %d', protocol)
+        logger.info(f'Protocol version: {protocol}')
         if protocol not in {1, 2}:
             logger.info(f'Unsupported protocol: {protocol}')
             sock.sendall(b'UNSUPPORTED PROTOCOL\0')
